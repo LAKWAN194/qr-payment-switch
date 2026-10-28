@@ -1,0 +1,8 @@
+# Training and evaluation only (week 5). When the service starts loading the model,
+# move whatever it needs at runtime (xgboost, numpy, joblib) into requirements.txt.
+-r requirements.txt
+xgboost==3.4.1
+scikit-learn==1.9.1
+pandas==3.0.6
+numpy==2.5.3
+joblib==1.6.0

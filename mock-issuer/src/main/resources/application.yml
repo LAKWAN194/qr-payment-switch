@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: mock-issuer
+
+issuer:
+  id: ${ISSUER_ID:BANK_A}
+
+server:
+  port: ${ISSUER_PORT:8181}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  info:
+    env:
+      enabled: true
+info:
+  issuer: ${issuer.id}

@@ -1,0 +1,18 @@
+# The switch's HTTP contract. Write each endpoint here before implementing it.
+#
+# Suggested order: merchant onboarding (week 2), payments with idempotency keys
+# (week 3), dashboard queries (week 7). For every operation, describe the error
+# responses as carefully as the success: 400, 404, 409 (conflict, for example an
+# idempotency key reused with a different request), 422, and 503.
+#
+# Preview it with any OpenAPI viewer, for example https://editor.swagger.io.
+openapi: 3.1.0
+info:
+  title: QR Payment Switch API
+  version: 0.1.0
+  description: LankaQR-style payment switch. Not affiliated with LankaPay; no real money moves.
+servers:
+  - url: http://localhost:8180
+paths: {}
+components:
+  schemas: {}

@@ -1,0 +1,145 @@
+# Local development stack.
+#
+#   docker compose up -d                    infrastructure only (Postgres, Kafka API, Redis)
+#   docker compose --profile apps up -d --build   infrastructure plus every service
+#
+# Ports can be changed in .env (copy .env.example). This project uses 8180-8186, 5481,
+# 6381 and 19181, so it can run next to the other portfolio projects.
+
+name: qr-payment-switch
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: switch
+      POSTGRES_USER: switch
+      POSTGRES_PASSWORD: ${SWITCH_DB_PASSWORD:-switch}
+    ports:
+      - "${SWITCH_DB_PORT:-5481}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U switch -d switch"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Redpanda speaks the Kafka protocol, starts in seconds and needs no ZooKeeper or KRaft setup.
+  redpanda:
+    image: redpandadata/redpanda:v26.2.3
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19181
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:${KAFKA_PORT:-19181}
+      - --pandaproxy-addr=internal://0.0.0.0:8082
+      - --advertise-pandaproxy-addr=internal://redpanda:8082
+      - --schema-registry-addr=internal://0.0.0.0:8081
+      - --rpc-addr=redpanda:33145
+      - --advertise-rpc-addr=redpanda:33145
+    ports:
+      - "${KAFKA_PORT:-19181}:19181"
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redpanda-console:
+    image: redpandadata/console:v3.12.0
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+    ports:
+      - "${CONSOLE_PORT:-8186}:8080"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  redis:
+    image: redis:8.8-alpine
+    ports:
+      - "${REDIS_PORT:-6381}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  switch-service:
+    profiles: [apps]
+    build:
+      context: .
+      dockerfile: docker/java-service.Dockerfile
+      args:
+        MODULE: switch-service
+    environment:
+      SWITCH_DB_URL: jdbc:postgresql://postgres:5432/switch
+      SWITCH_DB_USER: switch
+      SWITCH_DB_PASSWORD: ${SWITCH_DB_PASSWORD:-switch}
+    ports:
+      - "${SWITCH_PORT:-8180}:8180"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8180/actuator/health/liveness | grep -q UP"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  issuer-a:
+    profiles: [apps]
+    build:
+      context: .
+      dockerfile: docker/java-service.Dockerfile
+      args:
+        MODULE: mock-issuer
+    environment:
+      ISSUER_ID: BANK_A
+      ISSUER_PORT: 8181
+    ports:
+      - "${ISSUER_A_PORT:-8181}:8181"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  issuer-b:
+    profiles: [apps]
+    build:
+      context: .
+      dockerfile: docker/java-service.Dockerfile
+      args:
+        MODULE: mock-issuer
+    environment:
+      ISSUER_ID: BANK_B
+      ISSUER_PORT: 8182
+    ports:
+      - "${ISSUER_B_PORT:-8182}:8182"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  fraud-scorer:
+    profiles: [apps]
+    build: ./fraud-scorer
+    ports:
+      - "${FRAUD_PORT:-8183}:8000"
+
+  merchant-dashboard:
+    profiles: [apps]
+    build: ./merchant-dashboard
+    ports:
+      - "${DASHBOARD_PORT:-8184}:80"
+    depends_on:
+      switch-service:
+        condition: service_healthy
+
+volumes:
+  pgdata:

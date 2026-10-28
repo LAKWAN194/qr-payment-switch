@@ -1,0 +1,16 @@
+# Sample EMV merchant-presented QR payloads for your codec tests.
+#
+# Built for this project (they are not taken from the EMVCo document). Each CRC was
+# computed with Python's binascii.crc_hqx(data, 0xFFFF), an independent CRC-16/CCITT-FALSE
+# implementation, so they can check your code without depending on it.
+#
+# Columns: name <TAB> expected outcome <TAB> payload
+# Outcomes: VALID, BAD_CRC (checksum does not match), BAD_STRUCTURE (checksum matches but
+# the TLV fields do not parse), MISSING_MANDATORY (parses, but a required object is absent),
+# BAD_ORDER (parses, but the payload format indicator "00" is not first).
+static-valid	VALID	00020101021126430028io.github.lakwan194.qrswitch0107M0001235204581253031445802LK5916Kandy Brew House6005Kandy6304BF84
+dynamic-valid	VALID	00020101021226430028io.github.lakwan194.qrswitch0107M00012352045812530314454071250.005802LK5916Kandy Brew House6005Kandy62240113INV-2026-00420703T016304F138
+corrupted-name	BAD_CRC	00020101021126430028io.github.lakwan194.qrswitch0107M0001235204581253031445802LK5916Kandy Brew Housf6005Kandy6304BF84
+city-length-wrong	BAD_STRUCTURE	00020101021126430028io.github.lakwan194.qrswitch0107M0001235204581253031445802LK5916Kandy Brew House6006Kandy63040E4B
+currency-missing	MISSING_MANDATORY	00020101021126430028io.github.lakwan194.qrswitch0107M000123520458125802LK5916Kandy Brew House6005Kandy63042B7B
+format-indicator-not-first	BAD_ORDER	01021100020126430028io.github.lakwan194.qrswitch0107M0001235204581253031445802LK5916Kandy Brew House6005Kandy63042E62
